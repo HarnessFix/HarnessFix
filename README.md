@@ -2,10 +2,6 @@
 
 HarnessFix is a trace-guided framework for diagnosing failures in LLM agent trajectories and repairing the agent harness that caused them.
 
-This repository contains the code artifact for the paper:
-
-> From Failed Trajectories to Reliable LLM Agents: Diagnosing and Repairing Harness Flaws
-
 The public artifact keeps the source code, repair pipeline, analysis utilities, and the initial/final harness snapshots used by the paper. It intentionally excludes private API keys, local paths, raw benchmark data, model traces, downloaded files, logs, and generated evaluation outputs.
 
 ## What Is Included
@@ -129,7 +125,3 @@ These commands assume that the corresponding sampled datasets already exist unde
 - `traces/`, `logs/`, `results/`, `failure_analysis/results/`, and `failure_analysis/memory/` are generated at runtime and ignored by Git.
 - Large raw trajectories and benchmark outputs were excluded from the public repository.
 - The code uses public placeholder paths and OpenAI-compatible endpoints; configure your local environment through `.env` and `task_agent/model_registry.json`.
-
-## Citation
-
-If you use this artifact, please cite the accompanying paper once citation metadata is available.
