@@ -1,23 +1,28 @@
-# Task Agent 初始版本说明
+# Task Agent Version Notes
 
-本文档记录各 task agent 仓库所使用的初始固定版本，作为 AgentSystemEvolve 项目的基线。
+This document records the fixed initial versions used for the task-agent
+repositories. These versions define the baseline harnesses used by HarnessFix.
 
-## 版本选择原则
+## Version Selection Policy
 
-为保证实验的可复现性，在项目启动时将各仓库 checkout 到一个稳定的历史版本，避免上游持续更新导致结果不一致。版本选择区间为 2025 年底至 2026 年初，优先选取大版本更新之前的最后稳定版。
+To keep the experiments reproducible, each upstream repository was checked out
+to a stable historical version at the start of the project. This avoids result
+changes caused by ongoing upstream development. The selected versions generally
+come from late 2025 to early 2026, with preference for the last stable release
+before a major upstream rewrite.
 
 ---
 
-## 各仓库版本
+## Repository Versions
 
 ### mini-swe-agent
 
-| 字段 | 内容 |
+| Field | Value |
 |------|------|
-| **版本** | `v1.17.5` |
-| **日期** | 2026-01-30 |
+| **Version** | `v1.17.5` |
+| **Date** | 2026-01-30 |
 | **Commit** | `68d367bf` |
-| **选择理由** | v1.x 系列最后一个稳定版本。v2.0.0（2026-02-10）为大版本重构，中间有 197 个 commits 的变化，结构改动较大。v1.17.5 在 SWE-Bench 集成和接口方面成熟稳定。 |
+| **Rationale** | The last stable version in the v1.x series. v2.0.0, released on 2026-02-10, was a major rewrite with 197 intervening commits and substantial structural changes. v1.17.5 was mature and stable for SWE-Bench integration and interfaces. |
 
 ```bash
 cd task_agent/mini-swe-agent && git checkout v1.17.5
@@ -27,12 +32,12 @@ cd task_agent/mini-swe-agent && git checkout v1.17.5
 
 ### OpenHands
 
-| 字段 | 内容 |
+| Field | Value |
 |------|------|
-| **版本** | `1.1.0` |
-| **日期** | 2025-12-30 |
+| **Version** | `1.1.0` |
+| **Date** | 2025-12-30 |
 | **Commit** | `9885ddea3` |
-| **选择理由** | 2025 年底的稳定正式版本，相较于 1.0.0（2025-12-15）包含约两周的修复，比 1.2.x（2026-01-15）更保守稳定。 |
+| **Rationale** | A stable official release from the end of 2025. Compared with 1.0.0, released on 2025-12-15, it includes about two weeks of fixes while remaining more conservative than the 1.2.x line released around 2026-01-15. |
 
 ```bash
 cd task_agent/OpenHands && git checkout 1.1.0
@@ -42,11 +47,11 @@ cd task_agent/OpenHands && git checkout 1.1.0
 
 ### SWE-Fixer
 
-| 字段 | 内容 |
+| Field | Value |
 |------|------|
-| **版本** | commit `ab0bffd` |
-| **日期** | 2025-01-13 |
-| **说明** | 该仓库无任何 tag，维护较为随意（commit 消息多为 "update"）。选取 2025-01-13 的 merge commit 作为基线，为仓库中最后一个有明确意义的提交点。 |
+| **Version** | commit `ab0bffd` |
+| **Date** | 2025-01-13 |
+| **Notes** | This repository did not have tags and had a relatively informal maintenance history, with many commit messages such as "update". The merge commit from 2025-01-13 was selected as the baseline because it was the last clearly meaningful checkpoint in the repository history. |
 
 ```bash
 cd task_agent/SWE-Fixer && git checkout ab0bffd
@@ -54,21 +59,21 @@ cd task_agent/SWE-Fixer && git checkout ab0bffd
 
 ---
 
-## 恢复命令汇总
+## Restore Commands
 
-若需从其他状态恢复到初始基线版本，执行：
+To restore the initial baseline versions from another checkout state, run:
 
 ```bash
-cd /volume/med-train/users/mzchen/lab/AgentSystemEvolve/task_agent
+cd task_agent
 git -C mini-swe-agent checkout v1.17.5
 git -C OpenHands checkout 1.1.0
 git -C SWE-Fixer checkout ab0bffd
 ```
 
-## 备注
+## Notes
 
-- 当前各仓库均处于 detached HEAD 状态，如需在其上做修改，应先创建新分支：`git switch -c <branch-name>`
-- PLAN.md 规划的首要任务是使用 **mini-swe-agent** 在 SWE-Bench Lite 上跑初始测试并收集 Traces
+- The upstream repositories were evaluated at fixed detached-HEAD versions. If you need to modify one of them directly, create a branch first with `git switch -c <branch-name>`.
+- The initial SWE-Bench experiments used **mini-swe-agent** to run baseline evaluations and collect traces.
 
 ## HarnessFix SWE GPT-5 Mini Evolution Marker
 
