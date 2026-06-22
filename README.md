@@ -77,8 +77,7 @@ The repository does not include benchmark data. Use the scripts under `data/` af
 Examples:
 
 ```bash
-.venv/bin/python data/sample_train_test.py
-.venv/bin/python data/sample_val.py
+.venv/bin/python data/sample_swebench.py
 .venv/bin/python data/sample_gaia.py
 .venv/bin/python data/sample_terminal_bench.py
 APPWORLD_TASK_CACHE=/path/to/appworld/task_cache.json .venv/bin/python data/sample_appworld.py
