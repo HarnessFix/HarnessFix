@@ -553,17 +553,6 @@ class Terminus2(BaseAgent):
             for pattern in self._BLOCKING_OUTPUT_PATTERNS
         )
 
-    async def _terminal_is_waiting_for_multiline_input(
-        self, session: TmuxSession
-    ) -> bool:
-        try:
-            return await session.is_waiting_for_multiline_input()
-        except Exception as exc:
-            self.logger.debug(
-                "Failed to inspect terminal multiline prompt state: %s", exc
-            )
-            return False
-
     def _setup_episode_logging(
         self, logging_dir: Path | None, episode: int
     ) -> tuple[Path | None, Path | None, Path | None]:
@@ -1500,14 +1489,7 @@ so ask everything you need to know."""
                 if is_task_complete
                 else False
             )
-            multiline_input_blocker = (
-                await self._terminal_is_waiting_for_multiline_input(self._session)
-                if is_task_complete
-                else False
-            )
             if completion_blocker:
-                is_task_complete = False
-            if multiline_input_blocker:
                 is_task_complete = False
 
             # Construct the observation (what gets sent back to the LLM)
@@ -1516,14 +1498,6 @@ so ask everything you need to know."""
                 observation = (
                     "Completion was rejected by the harness because the terminal output contains a clear failure signal "
                     "(failed test, traceback, missing file/dependency, or assertion). Fix the issue and rerun verification before marking complete.\n"
-                    + self._limit_output_length(terminal_output)
-                )
-            elif multiline_input_blocker:
-                self._pending_completion = False
-                observation = (
-                    "Completion was rejected by the harness because the shell is still waiting for multiline input "
-                    "(for example a here-document or quoted string prompt). Send the missing terminator or interrupt the partial command, "
-                    "then rerun verification before marking complete.\n"
                     + self._limit_output_length(terminal_output)
                 )
             elif is_task_complete:

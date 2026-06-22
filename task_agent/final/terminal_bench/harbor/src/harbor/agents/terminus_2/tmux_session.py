@@ -11,31 +11,8 @@ from harbor.utils.logger import logger
 
 class TmuxSession:
     _ENTER_KEYS = {"Enter", "C-m", "KPEnter", "C-j", "^M", "^J"}
-    _SPECIAL_KEYS = {
-        "BSpace",
-        "BTab",
-        "C-Space",
-        "DC",
-        "Down",
-        "End",
-        "Enter",
-        "Escape",
-        "Home",
-        "IC",
-        "KPEnter",
-        "Left",
-        "NPage",
-        "PPage",
-        "Right",
-        "Space",
-        "Tab",
-        "Up",
-    }
     _ENDS_WITH_NEWLINE_PATTERN = r"[\r\n]$"
     _NEWLINE_CHARS = "\r\n"
-    _INCOMPLETE_SHELL_PROMPT_PATTERN = re.compile(
-        r"(?m)^(?:[^\r\n]*\r)?[>)]\s*$"
-    )
     _TMUX_COMPLETION_COMMAND = "; tmux wait -S done"
     # tmux silently drops commands exceeding its internal buffer (~16 KB since
     # tmux 1.9, see https://github.com/tmux/tmux/issues/254). Keep a
@@ -547,14 +524,6 @@ class TmuxSession:
     def _is_enter_key(self, key: str) -> bool:
         return key in self._ENTER_KEYS
 
-    def _is_special_key(self, key: str) -> bool:
-        return (
-            key in self._SPECIAL_KEYS
-            or bool(re.fullmatch(r"C-[A-Za-z0-9@\\[\\]\\\\^_?]", key))
-            or bool(re.fullmatch(r"M-[A-Za-z0-9]", key))
-            or bool(re.fullmatch(r"F\\d{1,2}", key))
-        )
-
     def _ends_with_newline(self, key: str) -> bool:
         result = re.search(self._ENDS_WITH_NEWLINE_PATTERN, key)
         return result is not None
@@ -569,15 +538,6 @@ class TmuxSession:
 
     def _is_executing_command(self, key: str) -> bool:
         return self._is_enter_key(key) or self._ends_with_newline(key)
-
-    def _ensure_trailing_newline(self, key: str) -> str:
-        if (
-            key
-            and not self._is_special_key(key)
-            and not self._is_executing_command(key)
-        ):
-            return f"{key}\n"
-        return key
 
     def _prevent_execution(self, keys: list[str]) -> list[str]:
         keys = keys.copy()
@@ -688,14 +648,6 @@ class TmuxSession:
         if block and min_timeout_sec > 0.0:
             self._logger.debug("min_timeout_sec will be ignored because block is True.")
 
-        if isinstance(keys, str):
-            keys = self._ensure_trailing_newline(keys)
-        else:
-            keys = [
-                self._ensure_trailing_newline(key) if isinstance(key, str) else key
-                for key in keys
-            ]
-
         prepared_keys, is_blocking = self._prepare_keys(
             keys=keys,
             block=block,
@@ -726,14 +678,6 @@ class TmuxSession:
 
     async def _get_visible_screen(self) -> str:
         return await self.capture_pane(capture_entire=False)
-
-    async def is_waiting_for_multiline_input(self) -> bool:
-        visible_screen = await self._get_visible_screen()
-        for line in reversed(visible_screen.splitlines()):
-            stripped = line.strip()
-            if stripped:
-                return bool(self._INCOMPLETE_SHELL_PROMPT_PATTERN.search(line))
-        return False
 
     async def _find_new_content(self, current_buffer: str) -> str | None:
         pb = "" if self._previous_buffer is None else self._previous_buffer.strip()
