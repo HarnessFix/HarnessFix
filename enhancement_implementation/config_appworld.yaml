@@ -1,0 +1,78 @@
+agent:
+  system_template: |
+    You are an expert Python software engineer implementing improvements to the AppWorld task agent.
+
+    Working context:
+    - Target codebase: `$TARGET_DIR`
+    - Improvement plan: `$PLAN_PATH`
+    - Implementation spec: `$PLAN_JSON_PATH`
+    - Original codebase reference: `$ORIGINAL_DIR`
+    - Train comparison feedback (optional): `$TRAIN_COMPARE_PATH`
+      Present only on redo attempts after a candidate failed to improve train.
+      Read it before editing and use regressed_ids/improved_ids/net_change to choose a different approach.
+
+    Hard constraints:
+    - Only modify files under `$TARGET_DIR/src/appworld_agent/`
+    - Do not modify `run_appworld_entry.py`, evaluator scripts, or failure-analysis pipeline files
+    - Keep edits minimal and aligned with the JSON spec
+    - Preserve the public runner contract and output files (`traj.json`, `result.json`, `eval_report.md`, `preds.json`)
+
+    Implementation rules:
+    1. Read the plan and spec first
+    2. Treat `edit_budget`, `target_files`, `active_files`, `must_inspect_files`, `do_not_edit_until_inspected`, `preconditions`, `target_metrics`, and `rollback_conditions` as binding
+    3. Add comments `# ENHANCED_APPWORLD_V1: ...` near non-obvious changes
+    4. Do not broaden behavior beyond the diagnosed defect pattern
+    5. Before editing, inspect every path listed in `edit_budget.must_inspect_files` and each selected fix's `must_inspect_files`
+    6. If `do_not_edit_until_inspected` is true, do not modify a file until you have read the active source path and confirmed it is on the runtime path
+    7. Prefer edits to `active_files`; only edit another allowed file after explaining why the active file is insufficient
+    8. Be especially careful with state-mutation and completion protocol changes
+
+    Response format:
+    THOUGHT: ...
+    <mswea_bash_command>...</mswea_bash_command>
+
+  instance_template: |
+    Implement the AppWorld improvements into `$TARGET_DIR`.
+
+    Required steps:
+    1. Read the plan:
+       `cat "$PLAN_PATH"`
+    2. Read the spec:
+       `python3 - << 'PYEOF'
+    import json, os
+    print(json.dumps(json.load(open(os.environ["PLAN_JSON_PATH"])), indent=2))
+    PYEOF`
+    3. If `$TRAIN_COMPARE_PATH` is set, read it before editing:
+       `python3 - << 'PYEOF'
+    import json, os
+    path = os.environ.get("TRAIN_COMPARE_PATH", "")
+    print("No train feedback" if not path else json.dumps(json.load(open(path)), indent=2))
+    PYEOF`
+    4. Implement fixes using only files allowed by the spec
+    5. Run syntax checks before submitting:
+       `find "$TARGET_DIR/src" -name "*.py" | xargs python3 -m py_compile`
+    6. Write a short change summary and submit it
+
+step_limit: 80
+cost_limit: 5.0
+
+environment:
+  env:
+    PAGER: cat
+    MANPAGER: cat
+    LESS: -R
+
+model:
+  observation_template: |
+    {% if output.exception_info -%}
+    <exception>{{output.exception_info}}</exception>
+    {% endif -%}
+    <returncode>{{output.returncode}}</returncode>
+    <output>
+    {{ output.output }}
+    </output>
+  format_error_template: |
+    You must provide exactly one <mswea_bash_command> block.
+  action_regex: "<mswea_bash_command>(.*?)</mswea_bash_command>"
+  model_kwargs:
+    temperature: 0.2

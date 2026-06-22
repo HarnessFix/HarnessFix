@@ -1,0 +1,207 @@
+agent:
+  system_template: |
+    You are an expert analyst of AppWorld harness failures.
+
+    Your task is to analyze failed AppWorld trajectories and produce structured JSON diagnoses.
+
+    The AppWorld task agent is a Python-code agent that operates through a Docker-backed AppWorld environment.
+    It issues exactly one Python code block per step, interacts through `apis.*`, and should finish by calling
+    `apis.supervisor.complete_task(...)`. For the official simplified ReAct backend, normalized traces include
+    `model_calls` converted from `official_logs/lm_calls.jsonl`; each entry has `request_messages` and
+    `response_message` with sensitive runtime fields such as API keys redacted.
+
+    Common AppWorld harness failure types include:
+    - API misuse: wrong parameters, missing login, incorrect API assumptions
+    - state mutation defects: unintended writes, collateral damage, premature destructive actions
+    - completion defects: never calling `complete_task()`, calling it too early, wrong answer argument
+    - prompt/orchestration defects: poor decomposition, missing verification, fragile recovery after API errors
+    - context defects: forgetting retrieved IDs/tokens/pages and repeating the same exploration
+
+    You are given an HTIR bundle using the same attribution schema as SWE-bench and GAIA:
+    `AgentTraceStep`, `OutcomeAnchor`, a base graph, and node-local facets. Use OutcomeAnchors
+    to localize symptoms, backtrack to candidate responsible steps, adjudicate with node-level
+    data/context, control-flow, artifact-state, and harness-layer evidence, then report the
+    implicated harness layers. Evaluator artifacts are external outcome anchors, not executable
+    trace nodes.
+
+    Your response MUST contain EXACTLY ONE `<mswea_bash_command>` block per turn.
+
+  instance_template: |
+    ## Your Assignment
+
+    Analyze this failed AppWorld run and attribute it to a concrete harness defect.
+
+    **Task ID**: `{{instance_id}}`
+    **Failure category**: `{{failure_category}}`
+    **Required apps**: `{{required_apps}}`
+    **Difficulty**: `{{difficulty}}`
+
+    **Task description**:
+    <task_description>
+    {{task_description}}
+    </task_description>
+
+    **Agent source for this run**: `{{agent_source_dir}}/`
+    **Agent source root**: `{{agent_source_root}}`
+
+    **Artifacts**
+    - Sanitized trajectory: `{{traj_path}}`
+    - Raw trajectory: `{{raw_traj_path}}`
+    - Evaluation result: `{{result_path}}`
+    - Evaluation report: `{{eval_report_path}}`
+    - HTIR bundle: `{{htir_path}}`
+
+    ## Analysis steps
+
+    1. Read a compact chronological trace projection. Do NOT `cat` the raw trajectory.
+       `python3 - <<'PY'
+    import json
+    data = json.load(open('{{traj_path}}'))
+    print('TRACE_INFO')
+    print(json.dumps(data.get('info', {}), indent=2, ensure_ascii=False)[:4000])
+    messages = data.get('messages', []) or []
+    model_calls = data.get('model_calls', []) or []
+    assistant_steps = sum(1 for m in messages if m.get('role') == 'assistant')
+    print(f'messages={len(messages)} assistant_steps={assistant_steps} model_calls={len(model_calls)}')
+    print('CHRONOLOGICAL_OUTPUTS')
+    for idx, msg in enumerate(messages):
+        role = msg.get('role') or msg.get('source') or '?'
+        content = msg.get('content') or msg.get('message') or msg.get('text') or ''
+        if not isinstance(content, str):
+            content = json.dumps(content, ensure_ascii=False)
+        if role not in {'assistant', 'tool', 'observation', 'environment'} and idx not in (0, len(messages) - 1):
+            continue
+        content = content.replace('\n', '\\n')
+        print(f'[{idx:03d}] {role}: {content[:900]}')
+    if model_calls:
+        print('RECENT_MODEL_RESPONSES')
+        for call in model_calls[-5:]:
+            response = call.get('response_message', {})
+            text = json.dumps(response, ensure_ascii=False)
+            req_count = len(call.get('request_messages', []) or [])
+            print(f"call={call.get('call_index')} request_messages={req_count} response={text[:1200]}")
+    PY`
+
+    2. Read compact evaluation evidence. Avoid dumping huge reports.
+       `python3 - <<'PY'
+    import json
+    from pathlib import Path
+    for path in ['{{result_path}}', '{{eval_report_path}}']:
+        p = Path(path)
+        print(f'--- {p.name} exists={p.exists()} size={p.stat().st_size if p.exists() else 0} ---')
+        if not p.exists():
+            continue
+        text = p.read_text(errors='replace')
+        if p.suffix == '.json':
+            try:
+                obj = json.loads(text)
+                keep = {k: obj.get(k) for k in ('task_id', 'score', 'success', 'pass_percentage', 'prediction', 'failures') if k in obj}
+                print(json.dumps(keep or obj, indent=2, ensure_ascii=False)[:6000])
+            except Exception:
+                print(text[:6000])
+        else:
+            print(text[:6000])
+    PY`
+
+    3. (Optional) If the chronology from Steps 1-2 is insufficient, inspect a compact HTIR projection:
+
+       `python3 - <<'PY'
+    import json
+    bundle = json.load(open('{{htir_path}}'))
+    print('OUTCOME_ANCHORS')
+    print(json.dumps(bundle.get('outcome_anchors', []), indent=2, ensure_ascii=False)[:5000])
+    print('AGENT_TRACE_STEPS')
+    for step in bundle.get('agent_trace_steps', []):
+        sid = step.get('step_id')
+        status = step.get('execution_status')
+        summary = str(step.get('summary') or step.get('action_summary') or '')[:700].replace('\n', '\\n')
+        print(f'{sid} status={status} summary={summary}')
+    print('RECENT_NODE_FACETS')
+    facets = bundle.get('node_facets', {}) or {}
+    for sid in list(facets)[-12:]:
+        facet = facets[sid]
+        slim = {
+            'harness_layer': facet.get('harness_layer'),
+            'control_flow': facet.get('control_flow'),
+            'artifact_state': facet.get('artifact_state'),
+            'data_and_context': facet.get('data_and_context'),
+        }
+        print(sid, json.dumps(slim, ensure_ascii=False)[:1200])
+    PY`
+
+    4. Inspect source code only if needed. Do not dump files longer than the ranges below:
+       `sed -n '1,220p' {{agent_source_dir}}/core.py`
+       `sed -n '1,220p' {{agent_source_dir}}/prompts.py`
+
+    5. Write diagnosis JSON with these required fields:
+       - `instance_id`
+       - `failure_category`
+       - `exit_status`
+       - `api_calls`
+       - `failure_manifestation`
+       - `failure_reason`
+       - `agent_design_issue`
+       - `affected_component`: one of `system_prompt / tool_use / api_execution / state_guard / answer_extraction / main_loop`
+       - `defect_class`: one of `termination / tool_affordance / parsing / verification / protocol / context / orchestration / state_mutation / completion_without_effect`
+       - `severity`
+       - `confidence`
+       - `fix_scope`: one of `additive_only / prompt_additive / prompt_restrictive / config_param`
+       - `unsafe_mutation_detected`: true/false
+
+    Guidance:
+    - If the agent called `complete_task()` but API/db effect evidence shows no required task-state mutation, diagnose `completion_without_effect`.
+    - If the agent never called `complete_task()` or called it with weak evidence, this is usually a protocol issue.
+    - If the evaluator shows unintended state changes, prioritize `state_guard` / `state_mutation`.
+    - If the agent kept repeating lookups or forgot tokens/IDs, prioritize `context` or `tool_use`.
+    - Ground every strong claim in HTIR nodes or evaluator anchors.
+
+    Run:
+    ```
+    cat > /tmp/result_{{instance_id}}.json << 'JSONEOF'
+    {
+      "instance_id": "FILL_instance_id",
+      "failure_category": "FILL_failure_category",
+      "exit_status": "FILL_exit_status",
+      "api_calls": 0,
+      "failure_manifestation": "FILL_one_sentence_symptom",
+      "failure_reason": "FILL_3_to_5_sentences_root_cause",
+      "agent_design_issue": "FILL_3_to_6_sentences_design_flaw_and_repair",
+      "affected_component": "FILL_component",
+      "defect_class": "FILL_defect_class",
+      "severity": "medium",
+      "confidence": "medium",
+      "fix_scope": "additive_only",
+      "unsafe_mutation_detected": false
+    }
+    JSONEOF
+    ```
+
+    5. Submit:
+       `echo COMPLETE_TASK_AND_SUBMIT_FINAL_OUTPUT && cat /tmp/result_{{instance_id}}.json`
+
+step_limit: 50
+cost_limit: 10
+
+environment:
+  observation_max_chars: 16000
+  env:
+    PAGER: cat
+    MANPAGER: cat
+    LESS: -R
+    PIP_PROGRESS_BAR: "off"
+    TQDM_DISABLE: "1"
+
+model:
+  observation_template: |
+    {% if output.exception_info -%}
+    <exception>{{output.exception_info}}</exception>
+    {% endif -%}
+    <returncode>{{output.returncode}}</returncode>
+    <output>
+    {{ output.output }}
+    </output>
+  format_error_template: |
+    You must provide exactly one <mswea_bash_command> block.
+  action_regex: "<mswea_bash_command>(.*?)</mswea_bash_command>"
+  model_kwargs:
+    temperature: 0.2

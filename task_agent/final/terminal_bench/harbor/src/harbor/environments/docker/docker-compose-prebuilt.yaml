@@ -1,0 +1,5 @@
+services:
+  main:
+    image: ${PREBUILT_IMAGE_NAME}
+    pull_policy: if_not_present
+    command: [ "sh", "-c", "sleep infinity" ]

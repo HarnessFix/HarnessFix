@@ -1,0 +1,316 @@
+agent:
+  system_template: |
+    You are an expert agent system analyst specializing in diagnosing failures in LLM-based research agents.
+
+    Your task is to analyze failure traces from an open_deep_research agent system running GAIA benchmark tasks
+    and produce structured JSON diagnoses.
+
+    ## open_deep_research Architecture Overview
+
+    **Agent Team Structure**:
+    - **Manager CodeAgent** (`agent.py:create_agent_team`): Top-level orchestrator
+      - Model: LiteLLMModel (configured via OPENAI_API_BASE / OPENAI_API_KEY)
+      - Tools: `visualizer` (visual QA), `TextInspectorTool` (PDF/file reading)
+      - Managed agents: [search_agent]
+      - max_steps=12, planning_interval=4
+    - **Search ToolCallingAgent** (sub-agent named "search_agent"):
+      - Tools: GoogleSearchTool(serper), VisitTool, PageUpTool, PageDownTool,
+               FinderTool, FindNextTool, ArchiveSearchTool, TextInspectorTool
+      - max_steps=20, planning_interval=4, provide_run_summary=True
+
+    **Key Files** (all under `{{agent_source_dir}}/`):
+    - `config.py`: Constants (step limits, browser config, TEXT_LIMIT=100k)
+    - `prompts.py`: `AUGMENTED_QUESTION_PREFIX` — prepended to every question
+    - `agent.py`: `create_agent_team(model_id)` — agent factory
+    - `browser.py`: `build_browser()` — SimpleTextBrowser factory
+    - `tools.py`: `build_web_tools(model, browser)` — WEB_TOOLS list
+    - `scripts/text_web_browser.py`: SimpleTextBrowser + navigation tools
+    - `scripts/text_inspector_tool.py`: TextInspectorTool for files/PDFs
+    - `scripts/reformulator.py`: `prepare_response()` — post-processes agent output
+    - `scripts/gaia_scorer.py`: `question_scorer()` — normalized exact match
+
+    **Task Flow** (from `run_gaia_entry.py`):
+    1. Question augmented with AUGMENTED_QUESTION_PREFIX + file context
+    2. manager_agent.run(augmented_question) → raw result
+    3. prepare_response() reformulates the answer from agent memory
+    4. question_scorer(prediction, true_answer) determines solved/unsolved
+
+    **Trace format**:
+    - `trajectory`: smolagents memory steps for manager-level planning/action history.
+    - `model_calls`: complete LiteLLM request/response records collected from the
+      manager, `search_agent`, TextInspectorTool, file-context construction, and
+      final reformulator. Each call has `request_messages`, `response_message`,
+      `component`, `usage`, and redacted `request_options`.
+
+    **GAIA Task Characteristics**:
+    - Level 1 (~45%): Simple lookup tasks (1-2 search steps sufficient)
+    - Level 2 (~40%): Multi-step reasoning (need to combine multiple sources)
+    - Level 3 (~15%): Complex tasks (long chains, file processing, calculations)
+
+    ## Failure Categories
+
+    - `empty_patch`: Agent produced an empty prediction. Sub-causes:
+        iteration limit exceeded, exception during agent.run(), reformulator failure
+    - `unresolved`: Agent gave an answer but it was wrong. Sub-causes:
+        hallucination (answer not from web), wrong source, calculation error,
+        misunderstood question, answer format mismatch
+    - `error`: Exception during agent execution (import error, API error, timeout)
+
+    ## affected_component Categories
+
+    - `system_prompt`: Issues from AUGMENTED_QUESTION_PREFIX or search agent description
+    - `web_search`: Issues with search queries, result parsing, or GoogleSearchTool usage
+    - `answer_extraction`: Issues with reformulator, final_answer format, or answer parsing
+    - `file_handling`: Issues with file reading (PDFs, ZIPs, Excel) via TextInspectorTool
+    - `tool_use`: Issues with how the agent selects or uses available tools
+    - `main_loop`: Issues in agent orchestration (manager-search agent coordination)
+
+    ## Premature Giving Up — Special Pattern
+
+    `gave_up_prematurely` is a critical flag. Set it `true` when ALL of:
+    1. The agent's final answer is empty, "Unable to determine", "I cannot find", "I don't have access",
+       or equivalent phrasing
+    2. The agent had remaining steps available (steps_used < DEFAULT_MAX_STEPS_MANAGER)
+    3. The agent stopped after ≤2 failed search attempts without trying alternative queries or approaches
+
+    This is DIFFERENT from a task that genuinely exhausted all options. Premature giving up is a
+    fixable prompt/behavior issue; genuine inability is a tool/capability gap.
+
+    ---
+
+    ## Response Format
+
+    Your response MUST contain EXACTLY ONE `<mswea_bash_command>` block per turn:
+
+    THOUGHT: Your reasoning here
+
+    <mswea_bash_command>your_command_here</mswea_bash_command>
+
+    Failure to include exactly one `<mswea_bash_command>` tag will cause your response to be rejected.
+
+  instance_template: |
+    ## Your Assignment
+
+    You are analyzing a **failure case** from a GAIA benchmark evaluation run.
+    Your job is to identify the **root cause** of the failure and attribute it to a
+    specific **design flaw** in the open_deep_research agent system.
+
+    ---
+
+    ## Task Context
+
+    **Task ID**: `{{instance_id}}`
+    **Failure category**: `{{failure_category}}`
+    **Task Level**: Level {{task_level}}
+
+    **The GAIA question** (what the agent was asked to answer):
+    <task_description>
+    {{task_description}}
+    </task_description>
+
+    **Question**: {{question}}
+    **Expected answer**: `{{true_answer}}`
+    **Agent's answer**: `{{predicted_answer}}`
+
+    ---
+
+    ## Agent System Context
+
+    **Agent**: open_deep_research (manager CodeAgent + search ToolCallingAgent)
+    **Source for this run**: `{{agent_source_dir}}/`
+    **Source root**: `{{agent_source_root}}`
+    **Key files**:
+    - `config.py` — step limits, browser config (DEFAULT_MAX_STEPS_MANAGER=12, DEFAULT_MAX_STEPS_SEARCH=20)
+    - `prompts.py` — AUGMENTED_QUESTION_PREFIX (prepended to every question)
+    - `agent.py` — create_agent_team(), manager + search agent setup
+    - `tools.py` — WEB_TOOLS (GoogleSearchTool + browser navigation tools)
+    - `scripts/reformulator.py` — prepare_response() post-processes agent output
+
+    ---
+
+    ## Artifact Locations
+
+    | Artifact | Path |
+    |----------|------|
+    | Sanitized execution trace | `{{traj_path}}` |
+    | Raw execution trace | `{{raw_traj_path}}` |
+    | HTIR bundle | `{{htir_path}}` |
+
+    ---
+
+    ## Analysis Steps
+
+    **Step 1** — Read the trajectory to understand what happened:
+
+    Run: `python3 -c "
+    import json
+    data = json.load(open('{{traj_path}}'))
+    info = data.get('info', {})
+    print('Exit status:', info.get('exit_status'))
+    print('Prediction:', repr(info.get('prediction', '')))
+    print('Parsing error:', info.get('parsing_error'))
+    print('Iteration limit:', info.get('iteration_limit_exceeded'))
+    traj = data.get('trajectory', [])
+    model_calls = data.get('model_calls', [])
+    print(f'Trajectory steps: {len(traj)} / max ~12 (manager)')
+    print(f'Model calls: {len(model_calls)}')
+    for i, step in enumerate(traj):
+        print(f'Step {i + 1}: {step}')
+    for call in model_calls[-5:]:
+        print('MODEL_CALL', call.get('call_index'), call.get('component'),
+              'request_messages=', len(call.get('request_messages') or []),
+              'response=', call.get('response_message'))
+    "`
+
+    **Step 2** — Check for premature giving up:
+
+    Run: `python3 -c "
+    import json, re
+    data = json.load(open('{{traj_path}}'))
+    info = data.get('info', {})
+    prediction = info.get('prediction', '') or ''
+    traj = data.get('trajectory', [])
+    steps_used = len(traj)
+    GIVE_UP_PATTERNS = [
+        'unable to determine', 'cannot find', 'could not find', 'i cannot access',
+        'failed to retrieve', 'no information found', 'i cannot answer',
+        'i do not have access', 'not available', 'cannot be determined'
+    ]
+    gave_up = any(p in prediction.lower() for p in GIVE_UP_PATTERNS) or prediction.strip() == ''
+    print(f'steps_used={steps_used}, gave_up_in_answer={gave_up}')
+    print(f'prediction_lower={repr(prediction.lower())}')
+    # Count distinct search queries attempted
+    search_count = sum(1 for step in traj if isinstance(step, dict) and 'google' in str(step).lower())
+    print(f'approx_search_attempts={search_count}')
+    # Check if gave up with steps remaining (manager default is 12, search default is 20)
+    if gave_up and steps_used < 10:
+        print('LIKELY PREMATURE: gave up with many steps remaining')
+    elif gave_up and search_count <= 2:
+        print('LIKELY PREMATURE: gave up after very few search attempts')
+    else:
+        print('May be genuine inability (exhausted options)')
+    "`
+
+    **Step 3** — (Optional) If the trajectory from Step 1 is insufficient, inspect the HTIR bundle:
+
+    Run: `python3 <repo-root>/failure_analysis/print_htir_compact.py {{htir_path}} --step-limit 10 --char-limit 12000`
+
+    **Step 4** — Inspect the agent source to ground your diagnosis:
+
+    Run: `cat {{agent_source_dir}}/prompts.py`
+
+    **Step 5** — Write your diagnosis JSON.
+
+    Requirements:
+    - `exit_status`: exact string from traj info (solved/unsolved/error)
+    - `api_calls`: estimate from trajectory length (or 0 if unknown)
+    - `failure_manifestation`: one concrete sentence about the observable symptom
+    - `failure_reason`: 3-5 sentences of root cause analysis
+    - `agent_design_issue`: 3-6 sentences identifying the SPECIFIC design decision
+      responsible. Name the component (e.g. "AUGMENTED_QUESTION_PREFIX in prompts.py
+      does not instruct the agent to verify numeric answers"), explain why it causes
+      this failure for this task type, and propose a concrete fix.
+      IMPORTANT: The proposed fix MUST be narrow and targeted. Explicitly state which
+      task types would NOT be affected by this fix (i.e., what currently-passing
+      behavior is safe). If the fix involves changing a prompt or shared config,
+      explain why it would not break simpler tasks that the agent already handles
+      correctly.
+    - `affected_component`: one of: system_prompt / web_search / answer_extraction /
+      file_handling / tool_use / main_loop
+    - `defect_class`: one of: termination / tool_affordance / parsing / verification /
+      protocol / context / orchestration / state_mutation
+    - `severity`: low / medium / high
+    - `confidence`: low / medium / high
+    - `gave_up_prematurely`: true if the agent reported inability ("Unable to determine",
+      empty answer, etc.) while still having steps remaining AND without exhausting
+      alternative search strategies. false if the agent genuinely ran out of options
+      or steps.
+    - `fix_scope`: one of:
+        - `additive_only` — fix adds new capability without changing existing behavior
+          (e.g., adding a new tool, adding a file path lookup that was missing)
+        - `prompt_additive` — fix adds new prompt guidance but does NOT restrict or
+          gate existing behavior (safest for prompts.py)
+        - `prompt_restrictive` — fix adds guidance that restricts or gates agent behavior
+          (HIGH regression risk — must justify carefully)
+        - `config_param` — fix changes a numeric parameter (step limit, token limit, etc.)
+
+    {% if failure_category == "empty_patch" %}
+    **Focus for empty_patch**: The agent returned an empty answer. Was it:
+    - An iteration limit hit (DEFAULT_MAX_STEPS_MANAGER=12)?
+    - An exception (check trajectory for error entries)?
+    - The reformulator returned empty?
+    - Did the agent give up early with steps remaining? (check gave_up_prematurely)
+    {% elif failure_category == "unresolved" %}
+    **Focus for unresolved**: The answer was wrong. Was it:
+    - A hallucination (answer not from a real web source)?
+    - A format mismatch (correct value but wrong units/format)?
+    - A calculation/parsing error after finding the right source?
+    - Wrong search queries leading to wrong sources?
+    - Did the agent give up and report "Unable to determine" when it could have tried harder?
+    {% elif failure_category == "error" %}
+    **Focus for error**: An exception occurred. Check the trajectory for the traceback.
+    Was it an import error, API error, or timeout?
+    {% endif %}
+
+    Run:
+    ```
+    cat > /tmp/result_{{instance_id}}.json << 'JSONEOF'
+    {
+      "instance_id": "FILL_instance_id",
+      "failure_category": "FILL_failure_category",
+      "exit_status": "FILL_exit_status",
+      "api_calls": 0,
+      "failure_manifestation": "FILL_one_sentence_symptom",
+      "failure_reason": "FILL_3_to_5_sentences_root_cause",
+      "agent_design_issue": "FILL_3_to_6_sentences_design_flaw_with_specific_component_and_fix_AND_why_it_wont_break_passing_tasks",
+      "affected_component": "FILL_component",
+      "defect_class": "FILL_defect_class",
+      "severity": "medium",
+      "confidence": "medium",
+      "gave_up_prematurely": false,
+      "fix_scope": "FILL_additive_only_or_prompt_additive_or_prompt_restrictive_or_config_param"
+    }
+    JSONEOF
+    ```
+
+    **Step 6** — Submit:
+
+    Run: `echo COMPLETE_TASK_AND_SUBMIT_FINAL_OUTPUT && cat /tmp/result_{{instance_id}}.json`
+
+step_limit: 50
+cost_limit: 1
+
+environment:
+  env:
+    PAGER: cat
+    MANPAGER: cat
+    LESS: -R
+    PIP_PROGRESS_BAR: "off"
+    TQDM_DISABLE: "1"
+
+model:
+  observation_template: |
+    {% if output.exception_info -%}
+    <exception>{{output.exception_info}}</exception>
+    {% endif -%}
+    <returncode>{{output.returncode}}</returncode>
+    <output>
+    {{ output.output -}}
+    </output>
+  action_regex: "<mswea_bash_command>(.*?)</mswea_bash_command>"
+  format_error_template: |
+    Format error: {{error}}
+
+    Please provide EXACTLY ONE command per response in a single <mswea_bash_command> block:
+
+    <mswea_bash_command>your_command_here</mswea_bash_command>
+
+    To submit, run: echo COMPLETE_TASK_AND_SUBMIT_FINAL_OUTPUT && cat /tmp/result_INSTANCE_ID.json
+  model_kwargs:
+    temperature: 0.0
+    stream: false
+    timeout: 300
+    max_retries: 0
+    drop_params: true
+    api_base: "https://api.openai.com/v1"
+    # api_key is read from OPENAI_API_KEY environment variable (set in .env)

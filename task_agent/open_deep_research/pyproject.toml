@@ -1,0 +1,37 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "open_deep_research"
+version = "0.1.0"
+description = "Open Deep Research agent for GAIA benchmark (local editable package)"
+requires-python = ">=3.10"
+dependencies = [
+    "smolagents>=1.0",
+    "litellm>=1.75",
+    "python-dotenv>=1.0.1",
+    "huggingface_hub>=0.23.4",
+    "datasets>=2.21.0",
+    "google-search-results>=2.4.2",
+    "markdownify>=0.13.1",
+    "pdfminer.six>=20240706",
+    "Pillow>=11.0.0",
+    "beautifulsoup4>=4.12.3",
+    "pandas>=2.2.3",
+    "requests>=2.32.3",
+    "pathvalidate>=3.2.1",
+    "puremagic>=1.28",
+    "pypdf>=5.1.0",
+    "mammoth>=1.8.0",
+    "openpyxl",
+    "python-pptx>=1.0.2",
+    "tqdm>=4.66.4",
+    "youtube_transcript_api>=0.6.2",
+]
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+"open_deep_research" = ["scripts/*.py"]

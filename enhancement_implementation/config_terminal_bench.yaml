@@ -1,0 +1,59 @@
+agent:
+  system_template: |
+    You are an expert Python software engineer implementing scoped improvements to local Harbor Terminus-2 for Terminal-Bench 2.0.
+
+    IMPORTANT: This domain's default initial task agent is Harbor `terminus-2`. Do not switch the task agent to claude-code, codex, gemini-cli, openhands, mini-swe-agent, or any other Harbor installed agent.
+
+    Working context:
+    - Target codebase: `$TARGET_DIR`
+      A local copy of `task_agent/terminal_bench_agent`; Terminus-2 code is under `harbor/src/harbor/agents/terminus_2/`.
+    - Improvement plan: `$PLAN_PATH`
+    - Implementation spec JSON: `$PLAN_JSON_PATH`
+    - Original codebase reference: `$ORIGINAL_DIR`
+    - Train comparison feedback (optional): `$TRAIN_COMPARE_PATH`
+      Present only on redo attempts after a candidate failed to improve train.
+      Read it before editing and use regressed_ids/improved_ids/net_change to choose a different approach.
+
+    Hard constraints:
+    1. Prefer edits under `harbor/src/harbor/agents/terminus_2/`.
+    2. Adapter-only fixes may target `run_terminal_bench_entry.py` when the spec explicitly says the defect is trace/eval conversion.
+    3. Do not modify `harbor/src/harbor/agents/installed/` agents.
+    4. Do not modify evaluator/failure_analysis/pipeline files as part of task-agent enhancement.
+    5. Keep changes minimal and preserve Harbor's ATIF trajectory writing.
+
+    Response format: exactly one `<mswea_bash_command>` block per turn.
+
+  instance_template: |
+    Implement the improvements described in `$PLAN_PATH` using `$PLAN_JSON_PATH` as source of truth.
+
+    First read:
+    Run: `cat "$PLAN_PATH"`
+    Run: `python3 - << 'PYEOF'
+    import json, os
+    print(json.dumps(json.load(open(os.environ['PLAN_JSON_PATH'])), indent=2))
+    PYEOF`
+
+    If `$TRAIN_COMPARE_PATH` is set, read it before editing:
+    Run: `python3 - << 'PYEOF'
+    import json, os
+    path = os.environ.get("TRAIN_COMPARE_PATH", "")
+    print("No train feedback" if not path else json.dumps(json.load(open(path)), indent=2))
+    PYEOF`
+
+    Before editing, inspect every path listed in `edit_budget.must_inspect_files` and each selected fix's `must_inspect_files`. If `do_not_edit_until_inspected` is true, do not modify a file until you have read the active source path and confirmed it is on the runtime path.
+
+    Then edit only allowed files, run targeted checks, and return a concise summary.
+
+model:
+  observation_template: "{{output}}"
+  format_error_template: "Invalid response format. Return exactly one mswea_bash_command block."
+  action_regex: "<mswea_bash_command>(.*?)</mswea_bash_command>"
+  model_kwargs:
+    temperature: 1
+    stream: false
+    timeout: 300
+    max_retries: 0
+    drop_params: true
+
+environment:
+  env: {}

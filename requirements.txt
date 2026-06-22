@@ -1,0 +1,10 @@
+datasets
+docker
+jsonlines
+litellm
+openai
+pydantic
+python-dotenv
+pyyaml
+requests
+tqdm
