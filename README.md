@@ -12,7 +12,7 @@ enhancement_implementation/    Modify-agent prompts/configs for scoped harness r
 task_agent/                    Benchmark task agents and runner scripts
 task_agent/final/              Final repaired harness snapshots used as paper artifacts
 data/                          Dataset sampling scripts, not the datasets themselves
-eval/                          Lightweight evaluators for GAIA, AppWorld, and Terminal-Bench outputs
+eval/                          Lightweight evaluators for GAIA, AppWorld, and Terminal-Bench; SWE uses the official SWE-Bench harness
 run_pipeline_*.py              End-to-end closed-loop pipelines
 ```
 
