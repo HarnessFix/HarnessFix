@@ -16,6 +16,13 @@ eval/                          Lightweight evaluators for GAIA, AppWorld, and Te
 run_pipeline_*.py              End-to-end closed-loop pipelines
 ```
 
+Additional paper artifacts:
+
+- `exp/`: detailed experimental setup, RQ1-RQ4 result tables, ablations, and transfer analysis.
+- `discussion/`: extended token-cost and harness-flaw-pattern discussion.
+- `docs/diagnosis_annotation.md`: human annotation set and Fleiss' kappa agreement for the RQ2 diagnosis-quality audit.
+- `docs/motivation_study.md`: collection, classification, and repair-strategy extraction details for the motivational study.
+
 Final repaired harness snapshots:
 
 - `task_agent/final/swe`
