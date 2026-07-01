@@ -13,7 +13,7 @@ Outputs:
 
 Usage:
   .venv/bin/python3 failure_analysis/aggregate_results.py
-  .venv/bin/python3 failure_analysis/aggregate_results.py --model openai/claude-opus-4-5-20251101-thinking
+  .venv/bin/python3 failure_analysis/aggregate_results.py --model openai/gpt-5-mini
   .venv/bin/python3 failure_analysis/aggregate_results.py --force   # overwrite existing
 """
 
@@ -56,7 +56,7 @@ IMPROVEMENT_PLANS_DIR = REPO_ROOT / "improvement_plans"
 IMPROVEMENT_PLAN_PATH = IMPROVEMENT_PLANS_DIR / "improvement_plan.md"
 IMPROVEMENT_SPEC_PATH = IMPROVEMENT_PLANS_DIR / "improvement_plan.json"
 
-DEFAULT_MODEL = "openai/claude-opus-4-5-20251101-thinking"
+DEFAULT_MODEL = "openai/gpt-5-mini"
 MODEL_KWARGS = {
     "temperature": 1,
     "stream": False,

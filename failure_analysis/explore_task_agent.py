@@ -9,7 +9,7 @@ analysis agent so it has precise knowledge of what the task agent actually does.
 
 Usage:
   .venv/bin/python3 failure_analysis/explore_task_agent.py
-  .venv/bin/python3 failure_analysis/explore_task_agent.py --model openai/claude-opus-4-5-20251101-thinking
+  .venv/bin/python3 failure_analysis/explore_task_agent.py --model openai/gpt-5-mini
   .venv/bin/python3 failure_analysis/explore_task_agent.py --force   # re-run even if doc exists
 """
 
@@ -29,7 +29,7 @@ from dotenv import load_dotenv
 load_dotenv(Path(__file__).parent.parent / ".env", override=True)
 
 IMPL_DOC_PATH = Path(__file__).parent / "task_agent_impl_doc.md"
-DEFAULT_MODEL = "openai/claude-opus-4-5-20251101-thinking"
+DEFAULT_MODEL = "openai/gpt-5-mini"
 TRAJ_OUTPUT_PATH = Path(__file__).parent / "results" / "explore_task_agent.traj.json"
 
 TASK_AGENT_SRC = str(REPO_ROOT / "task_agent" / "mini-swe-agent" / "src" / "minisweagent")

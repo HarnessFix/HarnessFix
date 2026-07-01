@@ -1048,8 +1048,8 @@ def main():
     parser = argparse.ArgumentParser(description="Closed-loop HarnessFix pipeline")
     parser.add_argument("--model", default="openai/gpt-5-mini",
                         help="Model for agent inference (default: openai/gpt-5-mini)")
-    parser.add_argument("--analysis-model", default="openai/claude-opus-4-5-20251101-thinking",
-                        help="Model for failure analysis + aggregation (default: openai/claude-opus-4-5-20251101-thinking)")
+    parser.add_argument("--analysis-model", default="openai/gpt-5-mini",
+                        help="Model for failure analysis + aggregation (default: openai/gpt-5-mini)")
     parser.add_argument("--workers", type=int, default=4,
                         help="Parallel workers for inference + harness (default: 4)")
     parser.add_argument("--cost-limit", type=float, default=1.0,

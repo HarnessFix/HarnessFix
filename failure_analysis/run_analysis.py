@@ -13,7 +13,7 @@ Usage examples:
       --traces-dir traces/gaia_train_round1 \\
       --eval-results eval/gaia_results_round1/results.json \\
       --output-file failure_analysis/results/gaia_train_round1_analysis.jsonl \\
-      --model openai/claude-opus-4-5-20251101-thinking \\
+      --model openai/gpt-5-mini \\
       --workers 2 --resume
 """
 
@@ -74,7 +74,7 @@ CONFIG_PATH_APPWORLD = ANALYSIS_DIR / "analysis_config_appworld.yaml"
 CONFIG_PATH_TERMINAL_BENCH = ANALYSIS_DIR / "analysis_config_terminal_bench.yaml"
 IMPL_DOC_PATH = ANALYSIS_DIR / "task_agent_impl_doc.md"
 
-DEFAULT_MODEL = "openai/claude-opus-4-5-20251101-thinking"
+DEFAULT_MODEL = "openai/gpt-5-mini"
 
 # Module-level path overrides (set by main() when CLI args are provided)
 _TRACES_DIR_OVERRIDE: Path | None = None

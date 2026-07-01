@@ -526,7 +526,7 @@ def step_record_memory(version: int, plan_path: Path, audit: dict | None, gate: 
 def main() -> None:
     parser = argparse.ArgumentParser(description="HarnessFix pipeline for AppWorld")
     parser.add_argument("--model", default="openai/gpt-5-mini")
-    parser.add_argument("--analysis-model", default="openai/claude-opus-4-5-20251101-thinking")
+    parser.add_argument("--analysis-model", default="openai/gpt-5-mini")
     parser.add_argument("--workers", type=int, default=2)
     parser.add_argument("--concurrency", type=int, default=4)
     parser.add_argument("--start-version", type=int, default=1)

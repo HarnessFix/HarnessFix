@@ -569,7 +569,7 @@ Next: run final Terminal-Bench held-out test evaluation with {label}
 def main() -> None:
     parser = argparse.ArgumentParser(description="HarnessFix pipeline for Terminal-Bench 2.0")
     parser.add_argument("--model", default="openai/gpt-5-mini")
-    parser.add_argument("--analysis-model", default="openai/claude-opus-4-5-20251101-thinking")
+    parser.add_argument("--analysis-model", default="openai/gpt-5-mini")
     parser.add_argument("--workers", type=int, default=2)
     parser.add_argument("--start-version", type=int, default=1)
     parser.add_argument("--max-iterations", type=int, default=3)
