@@ -132,3 +132,16 @@ These commands assume that the corresponding sampled datasets already exist unde
 - `traces/`, `logs/`, `results/`, `failure_analysis/results/`, and `failure_analysis/memory/` are generated at runtime and ignored by Git.
 - Large raw trajectories and benchmark outputs were excluded from the public repository.
 - The code uses public placeholder paths and OpenAI-compatible endpoints; configure your local environment through `.env` and `task_agent/model_registry.json`.
+
+## Citation
+
+If you find this repository useful, please cite:
+
+```bibtex
+@article{chen2026failed,
+  title={From Failed Trajectories to Reliable LLM Agents: Diagnosing and Repairing Harness Flaws},
+  author={Chen, Mengzhuo and Wang, Junjie and Liu, Zhe and Wang, Yawen and Wang, Qing},
+  journal={arXiv preprint arXiv:2606.06324},
+  year={2026}
+}
+```
