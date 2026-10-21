@@ -90,6 +90,18 @@ def _gave_up_prediction(prediction: str) -> bool:
     )
 
 
+def _evaluation_total(eval_data: dict[str, Any], trace_count: int) -> int:
+    # Evaluation outcomes and trace diagnostics have different populations.
+    for key in ("total", "total_instances"):
+        value = eval_data.get(key)
+        if isinstance(value, int) and value >= 0:
+            return value
+    ids = set()
+    for key in ("resolved_ids", "correct_ids", "unresolved_ids", "error_ids", "empty_patch_ids"):
+        ids.update(eval_data.get(key, []))
+    return len(ids) if ids else trace_count
+
+
 def _swe_eval_metrics(eval_data: dict[str, Any], total: int) -> dict[str, float]:
     resolved = len(eval_data.get("resolved_ids", []))
     unresolved = len(eval_data.get("unresolved_ids", []))
@@ -109,6 +121,7 @@ def compute_swe_metrics(traces_dir: str | Path, eval_path: str | Path) -> dict[s
     _, eval_data = load_eval_json(eval_path)
     traj_files = sorted(traces_dir.glob("*/*.traj.json"))
     total = len(traj_files)
+    evaluated_total = _evaluation_total(eval_data, total)
     api_calls = []
     costs = []
     loop_instances = 0
@@ -132,7 +145,7 @@ def compute_swe_metrics(traces_dir: str | Path, eval_path: str | Path) -> dict[s
         ):
             syntax_error_instances += 1
 
-    metrics = _swe_eval_metrics(eval_data, total)
+    metrics = _swe_eval_metrics(eval_data, evaluated_total)
     metrics.update(
         {
             "avg_api_calls": sum(api_calls) / total if total else 0.0,
@@ -150,6 +163,7 @@ def compute_gaia_metrics(traces_dir: str | Path, eval_path: str | Path) -> dict[
     _, eval_data = load_eval_json(eval_path)
     traj_files = sorted(traces_dir.glob("*/*.traj.json"))
     total = len(traj_files)
+    evaluated_total = _evaluation_total(eval_data, total)
     steps = []
     elapsed = []
     empty_predictions = 0
@@ -176,11 +190,11 @@ def compute_gaia_metrics(traces_dir: str | Path, eval_path: str | Path) -> dict[
         accuracy = float(eval_data.get("accuracy", 0.0) or 0.0)
     else:
         total_correct = len(eval_data.get("correct_ids", eval_data.get("resolved_ids", [])))
-        accuracy = total_correct / total if total else 0.0
+        accuracy = total_correct / evaluated_total if evaluated_total else 0.0
     metrics = {
         "accuracy": accuracy,
         "exact_match": accuracy,
-        "error_rate": len(eval_data.get("error_ids", [])) / total if total else 0.0,
+        "error_rate": len(eval_data.get("error_ids", [])) / evaluated_total if evaluated_total else 0.0,
         "empty_prediction_rate": empty_predictions / total if total else 0.0,
         "repeated_search_rate": repeated_search / total if total else 0.0,
         "avg_steps": sum(steps) / total if total else 0.0,
@@ -222,6 +236,7 @@ def compute_appworld_metrics(traces_dir: str | Path, eval_path: str | Path) -> d
     _, eval_data = load_eval_json(eval_path)
     traj_files = sorted(traces_dir.glob("*/*.traj.json"))
     total = len(traj_files)
+    evaluated_total = _evaluation_total(eval_data, total)
     api_calls = []
     costs = []
     step_counts = []
@@ -256,13 +271,13 @@ def compute_appworld_metrics(traces_dir: str | Path, eval_path: str | Path) -> d
             if _appworld_completion_attempted(data, commands) and _appworld_missing_effect_failure(failure_text):
                 completion_without_effect += 1
 
-    task_success_rate = len(eval_data.get("resolved_ids", [])) / total if total else 0.0
+    task_success_rate = len(eval_data.get("resolved_ids", [])) / evaluated_total if evaluated_total else 0.0
     metrics = {
         "resolved_rate": task_success_rate,
         "task_success_rate": task_success_rate,
-        "error_rate": len(eval_data.get("error_ids", [])) / total if total else 0.0,
-        "empty_patch_rate": len(eval_data.get("empty_patch_ids", [])) / total if total else 0.0,
-        "invalid_submission_rate": len(eval_data.get("error_ids", [])) / total if total else 0.0,
+        "error_rate": len(eval_data.get("error_ids", [])) / evaluated_total if evaluated_total else 0.0,
+        "empty_patch_rate": len(eval_data.get("empty_patch_ids", [])) / evaluated_total if evaluated_total else 0.0,
+        "invalid_submission_rate": len(eval_data.get("error_ids", [])) / evaluated_total if evaluated_total else 0.0,
         "collateral_damage_rate": unsafe_failures / total if total else 0.0,
         "assertion_failure_rate": assertion_failures / total if total else 0.0,
         "repeated_api_call_rate": repeated_code / total if total else 0.0,
@@ -280,6 +295,7 @@ def compute_terminal_bench_metrics(traces_dir: str | Path, eval_path: str | Path
     _, eval_data = load_eval_json(eval_path)
     traj_files = sorted(traces_dir.glob("*/*.traj.json"))
     total = len(traj_files)
+    evaluated_total = _evaluation_total(eval_data, total)
     api_calls = []
     costs = []
     steps = []
@@ -321,12 +337,12 @@ def compute_terminal_bench_metrics(traces_dir: str | Path, eval_path: str | Path
             if result.get("verifier_result") and info.get("exit_status") != "solved":
                 verifier_failures += 1
 
-    success_rate = len(eval_data.get("resolved_ids", [])) / total if total else 0.0
+    success_rate = len(eval_data.get("resolved_ids", [])) / evaluated_total if evaluated_total else 0.0
     metrics = {
         "resolved_rate": success_rate,
         "terminal_task_success_rate": success_rate,
-        "error_rate": len(eval_data.get("error_ids", [])) / total if total else 0.0,
-        "empty_patch_rate": len(eval_data.get("empty_patch_ids", [])) / total if total else 0.0,
+        "error_rate": len(eval_data.get("error_ids", [])) / evaluated_total if evaluated_total else 0.0,
+        "empty_patch_rate": len(eval_data.get("empty_patch_ids", [])) / evaluated_total if evaluated_total else 0.0,
         "repeated_command_rate": repeated_commands / total if total else 0.0,
         "missing_evidence_rate": missing_atif / total if total else 0.0,
         "assertion_failure_rate": verifier_failures / total if total else 0.0,
