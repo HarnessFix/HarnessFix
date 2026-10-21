@@ -1420,12 +1420,13 @@ def compile_gaia_htir(task_id: str, failure_category: str, traj_path: str,
             _add_edge(edges, aux_id, ex_id, "causal")
     last_id = auxiliary_parent
 
+    final_step_id = max(node["step_id"] for node in events) + 1
     submit_id = f"evt_{len(events):03d}"
     events.append(
         _event(
             submit_id,
             "SubmissionEvent",
-            len(traj.get("trajectory", [])) + 1,
+            final_step_id,
             "submitter",
             predicted_answer,
             "traj.info.prediction",
@@ -1449,7 +1450,7 @@ def compile_gaia_htir(task_id: str, failure_category: str, traj_path: str,
             _event(
                 ex_id,
                 "ExceptionEvent",
-                len(traj.get("trajectory", [])) + 1,
+                final_step_id,
                 "controller",
                 "iteration_limit_exceeded",
                 "traj.info.iteration_limit_exceeded",
