@@ -57,7 +57,10 @@ def evaluate(tasks: list[dict], traces_dir: Path) -> dict:
         info = load_traj_info(traces_dir, task_id)
         eval_result = load_eval_result(traces_dir, task_id)
 
-        if eval_result.get("success"):
+        if "success" in eval_result and not isinstance(eval_result["success"], bool):
+            error_ids.append(task_id)
+            continue
+        if eval_result.get("success") is True:
             resolved_ids.append(task_id)
             by_difficulty_resolved[difficulty] = by_difficulty_resolved.get(difficulty, 0) + 1
             continue
