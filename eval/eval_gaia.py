@@ -8,6 +8,11 @@ import json
 import sys
 from pathlib import Path
 
+if __package__:
+    from .task_ids import validate_task_ids
+else:
+    from task_ids import validate_task_ids
+
 from dotenv import load_dotenv
 
 load_dotenv(Path(__file__).parent.parent / ".env", override=True)
@@ -24,13 +29,14 @@ def load_subset_data(subset_dir: Path) -> dict[str, dict]:
     data_file = subset_dir / "data.jsonl"
     if not data_file.exists():
         raise FileNotFoundError(f"data.jsonl not found in {subset_dir}")
-    tasks: dict[str, dict] = {}
+    rows = []
     for line in data_file.read_text().splitlines():
         line = line.strip()
         if line:
             task = json.loads(line)
-            tasks[task["task_id"]] = task
-    return tasks
+            rows.append(task)
+    validate_task_ids(task.get("task_id") for task in rows)
+    return {task["task_id"]: task for task in rows}
 
 
 def load_traj_exit_status(traces_dir: Path, task_id: str) -> str | None:
@@ -45,6 +51,7 @@ def load_traj_exit_status(traces_dir: Path, task_id: str) -> str | None:
 
 
 def evaluate(preds: dict[str, str], tasks: dict[str, dict], traces_dir: Path | None) -> dict:
+    validate_task_ids(tasks)
     resolved_ids: list[str] = []
     unresolved_ids: list[str] = []
     empty_patch_ids: list[str] = []

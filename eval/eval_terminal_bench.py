@@ -7,6 +7,11 @@ import argparse
 import json
 import sys
 from pathlib import Path
+
+if __package__:
+    from .task_ids import validate_task_ids
+else:
+    from task_ids import validate_task_ids
 from typing import Any
 
 
@@ -26,8 +31,7 @@ def _task_ids_from_subset(subset: Path) -> list[str]:
                 continue
             row = json.loads(line)
             task_id = row.get("task_id") or row.get("instance_id") or row.get("name")
-            if task_id:
-                ids.append(str(task_id))
+            ids.append(task_id)
         return ids
     if subset.exists():
         return sorted(path.name for path in subset.iterdir() if path.is_dir())
@@ -68,6 +72,7 @@ def _load_result(traces_dir: Path, task_id: str) -> dict[str, Any]:
 
 
 def evaluate(task_ids: list[str], traces_dir: Path) -> dict[str, Any]:
+    validate_task_ids(task_ids)
     resolved_ids: list[str] = []
     unresolved_ids: list[str] = []
     empty_patch_ids: list[str] = []
@@ -121,7 +126,7 @@ def main() -> None:
     if not task_ids:
         run_info = args.traces_dir / "run_info.json"
         if run_info.exists():
-            task_ids = [str(item["task_id"]) for item in _load_json(run_info).get("tasks", [])]
+            task_ids = [item.get("task_id") for item in _load_json(run_info).get("tasks", [])]
     if not task_ids:
         print(f"ERROR: no Terminal-Bench task ids found from {args.subset} or run_info.json", file=sys.stderr)
         raise SystemExit(1)

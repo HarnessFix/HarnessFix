@@ -8,6 +8,11 @@ import json
 import sys
 from pathlib import Path
 
+if __package__:
+    from .task_ids import validate_task_ids
+else:
+    from task_ids import validate_task_ids
+
 
 def load_subset_data(subset_dir: Path) -> list[dict]:
     data_file = subset_dir / "data.jsonl"
@@ -18,6 +23,7 @@ def load_subset_data(subset_dir: Path) -> list[dict]:
         line = line.strip()
         if line:
             tasks.append(json.loads(line))
+    validate_task_ids(task.get("task_id") for task in tasks)
     return tasks
 
 
@@ -42,6 +48,7 @@ def load_eval_result(traces_dir: Path, task_id: str) -> dict:
 
 
 def evaluate(tasks: list[dict], traces_dir: Path) -> dict:
+    validate_task_ids(task.get("task_id") for task in tasks)
     resolved_ids: list[str] = []
     unresolved_ids: list[str] = []
     empty_patch_ids: list[str] = []
