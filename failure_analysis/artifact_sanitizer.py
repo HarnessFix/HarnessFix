@@ -41,9 +41,20 @@ INFO_METADATA_KEYS = {
 
 
 def _looks_like_provider_response(parent: dict[str, Any]) -> bool:
+    choices = parent.get("choices")
+    completion_choices = (
+        isinstance(choices, list)
+        and bool(choices)
+        and all(
+            isinstance(choice, dict)
+            and "index" in choice
+            and any(key in choice for key in ("message", "delta", "text"))
+            for choice in choices
+        )
+    )
     return (
         parent.get("object") == "chat.completion"
-        or "choices" in parent
+        or completion_choices
         or "system_fingerprint" in parent
         or ("usage" in parent and "model" in parent)
     )
