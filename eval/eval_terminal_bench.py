@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import math
 import sys
 from pathlib import Path
 from typing import Any
@@ -80,10 +81,19 @@ def evaluate(task_ids: list[str], traces_dir: Path) -> dict[str, Any]:
         reward = info.get("reward")
         if reward is None:
             reward = _reward_score(result)
+        invalid_reward = False
+        if reward is not None:
+            try:
+                numeric_reward = float(reward)
+                invalid_reward = not math.isfinite(numeric_reward)
+            except (TypeError, ValueError, OverflowError):
+                invalid_reward = True
+            if invalid_reward:
+                reward = None
         rewards[task_id] = reward
 
         exception = result.get("exception_info") or info.get("exception")
-        if exception or info.get("exit_status") == "error":
+        if invalid_reward or exception or info.get("exit_status") == "error":
             error_ids.append(task_id)
         elif reward is None:
             empty_patch_ids.append(task_id)
