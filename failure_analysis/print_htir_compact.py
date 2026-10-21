@@ -48,6 +48,8 @@ def _compact_step(step: dict[str, Any]) -> dict[str, Any]:
         "source_refs": step.get("source_refs") or step.get("source_ref"),
         "legacy_event_ids": step.get("legacy_event_ids"),
         "summary": step.get("summary"),
+        "request_message": step.get("request_message"),
+        "response_message": step.get("response_message"),
     }
     if step.get("request_summary"):
         keep["request_summary"] = step.get("request_summary")
