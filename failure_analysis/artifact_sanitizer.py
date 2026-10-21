@@ -58,7 +58,11 @@ def _drop_key(key: str, value: Any, parent: dict[str, Any], path: tuple[str, ...
         return True
     if path and path[-1] == "extra" and key in EXTRA_DUPLICATE_KEYS:
         return True
-    if key == "content" and isinstance(parent.get("extra"), dict) and "raw_output" in parent["extra"]:
+    if (
+        key == "content"
+        and isinstance(parent.get("extra"), dict)
+        and parent["extra"].get("raw_output") not in (None, "", {}, [])
+    ):
         return True
     if key in MESSAGE_PROVIDER_KEYS:
         return True
