@@ -1270,7 +1270,14 @@ def compile_gaia_htir(task_id: str, failure_category: str, traj_path: str,
         component = _gaia_component_for_step(step)
         summary = json.dumps(step, ensure_ascii=False)
         model_call = manager_model_calls[idx - 1] if idx - 1 < len(manager_model_calls) else None
+        inline_source_ref = None
         if not model_call and isinstance(step, dict) and step.get("model_input_messages"):
+            if step.get("model_output_message"):
+                inline_source_ref = f"trajectory[{idx - 1}].model_output_message"
+            elif "model_output" in step:
+                inline_source_ref = f"trajectory[{idx - 1}].model_output"
+            else:
+                inline_source_ref = f"trajectory[{idx - 1}]"
             response_message = step.get("model_output_message") or {"role": "assistant", "content": step.get("model_output", "")}
             model_call = {
                 "call_index": idx,
@@ -1289,7 +1296,9 @@ def compile_gaia_htir(task_id: str, failure_category: str, traj_path: str,
                 idx,
                 str(model_call.get("component") or component) if isinstance(model_call, dict) else component,
                 response_summary or f"{step_type}: {summary}",
-                f"traj.model_calls[{int(model_call.get('call_index', idx)) - 1}].response_message" if model_call and int(model_call.get('call_index', 0) or 0) > 0 else f"trajectory[{idx - 1}]",
+                inline_source_ref or (
+                    f"traj.model_calls[{int(model_call.get('call_index', idx)) - 1}].response_message" if model_call and int(model_call.get('call_index', 0) or 0) > 0 else f"trajectory[{idx - 1}]"
+                ),
                 {
                     "step_type": step_type,
                     "model_call_index": model_call.get("call_index") if isinstance(model_call, dict) else None,
