@@ -570,6 +570,8 @@ def main() -> None:
 
     for i in range(args.max_iterations):
         version = args.start_version + i
+        if version > 0 and args.force and not args.dry_run:
+            _cleanup_for_redo(version, args.model)
         print(f"\n{'#'*60}")
         print(f"  APPWORLD ITERATION {i+1}/{args.max_iterations}  (candidate v{version}, base v{current_base_version})")
         print(f"{'#'*60}")

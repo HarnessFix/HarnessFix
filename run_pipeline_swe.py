@@ -580,6 +580,24 @@ def _run_modify_versioned_swe(version: int, base_version: int,
     log(f"  modify_agent finished: exit_status={result.get('exit_status')}, traj={traj_path}")
 
 
+def _cleanup_for_redo(version: int, model: str) -> None:
+    """Invalidate candidate results before regenerating its source."""
+    import shutil
+    paths = [
+        enhanced_agent_dir(version),
+        train_traces_dir(model, version),
+        train_eval_dir(model, version),
+        val_enhanced_traces_dir(model, version),
+        val_enhanced_eval_dir(model, version),
+        train_logs_dir(model, version),
+        LOGS_DIR / val_enhanced_run_id(model, version) / eval_model_slug(model),
+    ]
+    for path in paths:
+        if path.exists():
+            shutil.rmtree(path)
+            log(f"  Removed {path.name} for redo")
+
+
 def step_val_inference(version: int, enhanced_src: Path, model: str,
                        workers: int, cost_limit: float, dry_run: bool) -> Path:
     """Run enhanced agent on val_50."""
@@ -1149,6 +1167,8 @@ def main():
 
     for i in range(args.max_iterations):
         version = args.start_version + i
+        if version > 0 and args.force and not args.dry_run:
+            _cleanup_for_redo(version, args.model)
         print(f"\n{'#'*60}")
         print(f"  ITERATION {i+1}/{args.max_iterations}  (candidate v{version}, base v{current_base_version})")
         print(f"{'#'*60}")
