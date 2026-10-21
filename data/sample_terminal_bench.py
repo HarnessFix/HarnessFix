@@ -21,10 +21,14 @@ DEFAULT_MANIFEST = REPO_ROOT / "data" / "terminal_bench_splits.json"
 
 def _find_task_dirs(source: Path) -> list[Path]:
     candidates = []
+    task_ids = set()
     for task_toml in source.rglob("task.toml"):
         task_dir = task_toml.parent
         if any(part.startswith(".") for part in task_dir.relative_to(source).parts):
             continue
+        if task_dir.name in task_ids:
+            raise SystemExit(f"Duplicate Terminal-Bench source task id: {task_dir.name}")
+        task_ids.add(task_dir.name)
         candidates.append(task_dir)
     return sorted(candidates, key=lambda p: p.name)
 
@@ -77,16 +81,19 @@ def _load_manifest_splits(path: Path, task_by_id: dict[str, Path]) -> dict[str, 
         ids = split_ids.get(split_name)
         if not isinstance(ids, list):
             raise SystemExit(f"Terminal-Bench split manifest missing list for {split_name}: {path}")
-        duplicates = sorted(task_id for task_id in ids if task_id in seen)
+        duplicates = set()
+        for task_id in ids:
+            if task_id in seen:
+                duplicates.add(task_id)
+            seen.add(task_id)
         if duplicates:
-            raise SystemExit("Duplicate Terminal-Bench task ids in manifest: " + ", ".join(duplicates))
+            raise SystemExit("Duplicate Terminal-Bench task ids in manifest: " + ", ".join(sorted(duplicates)))
         missing = sorted(task_id for task_id in ids if task_id not in task_by_id)
         if missing:
             raise SystemExit(
                 f"Terminal-Bench source is missing manifest task ids for {split_name}: "
                 + ", ".join(missing)
             )
-        seen.update(ids)
         splits[split_name] = [task_by_id[task_id] for task_id in ids]
     return splits
 
@@ -98,6 +105,8 @@ def _sample_random_splits(
     test_count: int,
     seed: int,
 ) -> dict[str, list[Path]]:
+    if min(train_count, val_count, test_count) < 0:
+        raise SystemExit("Terminal-Bench split counts must be non-negative")
     rng = random.Random(seed)
     shuffled = tasks[:]
     rng.shuffle(shuffled)
