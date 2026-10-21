@@ -100,13 +100,16 @@ def stratified_sample_no_overlap(
     val_tasks: list[dict] = []
     test_tasks: list[dict] = []
 
-    for level in sorted(train_counts.keys()):
+    levels = train_counts.keys() | val_counts.keys() | test_counts.keys()
+    for level in sorted(levels):
         pool = list(items_by_level.get(level, []))
         rng.shuffle(pool)
 
-        n_train = train_counts[level]
+        n_train = train_counts.get(level, 0)
         n_val = val_counts.get(level, 0)
         n_test = test_counts.get(level, 0)
+        if min(n_train, n_val, n_test) < 0:
+            raise ValueError(f"Level-{level} split counts must be non-negative")
         needed = n_train + n_val + n_test
 
         if len(pool) < needed:
