@@ -202,7 +202,7 @@ def _trial_records(job_dir: Path, job_result: dict[str, Any]) -> list[tuple[dict
             records.append((_load_json(result_path), candidate))
         elif config_path.exists():
             config = _load_json(config_path)
-            records.append({"trial_name": candidate.name, "config": config}, candidate)
+            records.append(({"trial_name": candidate.name, "config": config}, candidate))
     return records
 
 
