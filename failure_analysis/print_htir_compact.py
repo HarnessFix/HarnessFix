@@ -26,9 +26,11 @@ def _clip(value: Any, limit: int = 900) -> Any:
 
 
 def _select_steps(steps: list[dict[str, Any]], limit: int) -> list[dict[str, Any]]:
+    if limit <= 0:
+        raise ValueError("step limit must be positive")
     if len(steps) <= limit:
         return steps
-    head_count = min(3, max(1, limit // 3))
+    head_count = min(3, limit // 3)
     tail_count = max(1, limit - head_count)
     selected = steps[:head_count] + steps[-tail_count:]
     omitted = len(steps) - len(selected)
@@ -110,12 +112,17 @@ def main() -> None:
     parser.add_argument("--step-limit", type=int, default=16)
     parser.add_argument("--char-limit", type=int, default=45000)
     args = parser.parse_args()
+    if args.step_limit <= 0:
+        parser.error("--step-limit must be positive")
 
     bundle = json.loads(args.htir_path.read_text(errors="replace"))
     compact = _clip(build_compact_bundle(bundle, args.step_limit))
     text = json.dumps(compact, ensure_ascii=False, indent=2)
-    if args.char_limit > 0 and len(text) > args.char_limit:
-        text = text[: args.char_limit - 80] + "\n... [compact HTIR output truncated]\n"
+    if args.char_limit > 0:
+        budget = args.char_limit - 1  # Reserve the newline emitted by print.
+        if len(text) > budget:
+            marker = "\n... [compact HTIR output truncated]"
+            text = text[:max(0, budget - len(marker))] + marker[:budget]
     print(text)
 
 
