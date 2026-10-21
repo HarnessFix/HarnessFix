@@ -351,6 +351,12 @@ def main() -> None:
     parser.set_defaults(store_all_messages=True)
     args = parser.parse_args()
 
+    # Harbor runs from REPO_ROOT; retain the caller's path interpretation.
+    args.subset = args.subset.resolve()
+    args.output = args.output.resolve()
+    if args.mini_swe_agent_src is not None:
+        args.mini_swe_agent_src = args.mini_swe_agent_src.resolve()
+
     args.output.mkdir(parents=True, exist_ok=True)
     job_dir = _run_harbor(args)
     _convert_outputs(
