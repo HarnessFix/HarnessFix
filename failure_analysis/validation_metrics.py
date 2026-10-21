@@ -16,6 +16,7 @@ LOWER_IS_BETTER = {
     "syntax_error_rate",
     "avg_instance_cost",
     "avg_steps",
+    "avg_elapsed_seconds",
     "avg_api_calls",
     "collateral_damage_rate",
     "assertion_failure_rate",
