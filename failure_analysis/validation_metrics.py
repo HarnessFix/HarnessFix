@@ -393,10 +393,15 @@ def evaluate_target_metrics(plan_spec: dict[str, Any], baseline: dict[str, Any],
 
 
 def compute_cost_ratio(baseline: dict[str, Any], current: dict[str, Any]) -> float:
-    baseline_cost = baseline["metrics"].get("avg_instance_cost")
-    current_cost = current["metrics"].get("avg_instance_cost")
-    if baseline_cost and current_cost:
-        return current_cost / baseline_cost if baseline_cost else 1.0
-    baseline_steps = baseline["metrics"].get("avg_steps") or baseline["metrics"].get("avg_api_calls") or 1.0
-    current_steps = current["metrics"].get("avg_steps") or current["metrics"].get("avg_api_calls") or baseline_steps
-    return current_steps / baseline_steps if baseline_steps else 1.0
+    # Select a shared unit before dividing; zero is a valid numerator.
+    for metric in ("avg_instance_cost", "avg_steps", "avg_api_calls"):
+        baseline_value = baseline["metrics"].get(metric)
+        current_value = current["metrics"].get(metric)
+        if (
+            baseline_value is not None
+            and current_value is not None
+            and baseline_value > 0
+            and current_value >= 0
+        ):
+            return current_value / baseline_value
+    return 1.0
