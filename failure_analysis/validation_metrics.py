@@ -309,7 +309,9 @@ def compute_terminal_bench_metrics(traces_dir: str | Path, eval_path: str | Path
         commands = []
         for step in atif_steps:
             for call in step.get("tool_calls", []) or []:
-                commands.append(re.sub(r"\s+", " ", json.dumps(call, ensure_ascii=False).strip()))
+                # Invocation IDs and bookkeeping are unique even for identical calls.
+                identity = {"function_name": call.get("function_name"), "arguments": call.get("arguments")}
+                commands.append(json.dumps(identity, ensure_ascii=False, sort_keys=True))
         if _max_run(commands) >= 4:
             repeated_commands += 1
         result_path = traj_file.parent / "result.json"
