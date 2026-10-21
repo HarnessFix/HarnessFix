@@ -25,6 +25,24 @@ def _resolved_ids(eval_json: Path, subset: set[str]) -> set[str]:
     return set(data.get("resolved_ids", [])) & subset
 
 
+def _validate_cohort(traces: Path, report: dict, subset: set[str], label: str) -> None:
+    trace_ids = []
+    for path in traces.glob("*/*.traj.json"):
+        task_id = path.parent.name
+        if not path.is_file() or path.name != f"{task_id}.traj.json":
+            raise ValueError(f"{label} has a noncanonical or duplicate task trace: {path.name}")
+        trace_ids.append(task_id)
+    if len(trace_ids) != len(set(trace_ids)) or set(trace_ids) != subset:
+        raise ValueError(f"{label} trace cohort must exactly match --val-ids")
+    for key, values in report.items():
+        if key.endswith("_ids"):
+            if not isinstance(values, list) or any(not isinstance(value, str) or value not in subset for value in values):
+                raise ValueError(f"{label} report {key} contains invalid or out-of-cohort task IDs")
+    for key in ("total", "total_instances"):
+        if key in report and report[key] != len(subset):
+            raise ValueError(f"{label} report {key} does not match --val-ids")
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description="Validate enhanced agent against a baseline gate")
     parser.add_argument("--mode", choices=["swe", "gaia", "appworld", "terminal_bench"], default="swe")
@@ -43,8 +61,18 @@ def main() -> None:
     args = parser.parse_args()
 
     subset = set(args.val_ids.read_text().split())
-    baseline_path, _ = load_eval_json(args.baseline_eval)
-    current_path, _ = load_eval_json(args.current_eval)
+    if not subset:
+        parser.error("--val-ids must contain at least one task")
+    baseline_path, baseline_report = load_eval_json(args.baseline_eval)
+    current_path, current_report = load_eval_json(args.current_eval)
+    if args.baseline_traces or args.current_traces:
+        if not (args.baseline_traces and args.current_traces):
+            parser.error("Cohort validation requires both baseline and current traces")
+        try:
+            _validate_cohort(args.baseline_traces, baseline_report, subset, "baseline")
+            _validate_cohort(args.current_traces, current_report, subset, "current")
+        except ValueError as error:
+            parser.error(str(error))
 
     baseline_resolved = _resolved_ids(baseline_path, subset)
     current_resolved = _resolved_ids(current_path, subset)
