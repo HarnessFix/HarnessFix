@@ -41,6 +41,13 @@ def main() -> None:
     parser.add_argument("--min-target-improvement", type=float, default=0.0)
     parser.add_argument("--max-cost-ratio", type=float, default=1.25)
     args = parser.parse_args()
+    if bool(args.baseline_traces) != bool(args.current_traces):
+        parser.error("--baseline-traces and --current-traces must be provided together")
+    for label, directory in (("baseline", args.baseline_traces), ("current", args.current_traces)):
+        if directory is not None and not directory.is_dir():
+            parser.error(f"{label} trace directory not found: {directory}")
+    if args.plan_spec is not None and not args.plan_spec.is_file():
+        parser.error(f"Plan file not found: {args.plan_spec}")
 
     subset = set(args.val_ids.read_text().split())
     baseline_path, _ = load_eval_json(args.baseline_eval)
@@ -55,8 +62,10 @@ def main() -> None:
     net_change = len(current_resolved) - len(baseline_resolved)
 
     plan_spec = {"fixes": []}
-    if args.plan_spec and args.plan_spec.exists():
+    if args.plan_spec:
         plan_spec = json.loads(args.plan_spec.read_text())
+    if any(fix.get("target_metrics") for fix in plan_spec.get("fixes", [])) and not args.baseline_traces:
+        parser.error("A plan with target metrics requires baseline and current traces")
 
     baseline_metrics = None
     current_metrics = None
