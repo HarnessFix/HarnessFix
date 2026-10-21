@@ -47,6 +47,7 @@ def main() -> None:
     parser.add_argument("--skip-sampling", action="store_true")
     args = parser.parse_args()
 
+    manifest_path = args.manifest.resolve()
     dest = args.dest.resolve()
     if dest.exists():
         raise SystemExit(f"Destination already exists: {dest}")
@@ -57,13 +58,14 @@ def main() -> None:
     clone_cmd.extend([SOURCES[args.source], str(dest)])
     _run(clone_cmd)
 
-    revision = args.revision or _pinned_revision(args.source, args.manifest)
+    revision = args.revision or _pinned_revision(args.source, manifest_path)
     if revision:
         _run(["git", "-C", str(dest), "fetch", "--depth", "1", "origin", revision])
         _run(["git", "-C", str(dest), "checkout", "--detach", revision])
 
     if not args.skip_sampling:
-        sample_cmd = [sys.executable, str(REPO_ROOT / "data" / "sample_terminal_bench.py"), "--source", str(dest)]
+        sample_cmd = [sys.executable, str(REPO_ROOT / "data" / "sample_terminal_bench.py"), "--source", str(dest),
+                      "--manifest", str(manifest_path)]
         if args.copy_splits:
             sample_cmd.append("--copy")
         _run(sample_cmd)
