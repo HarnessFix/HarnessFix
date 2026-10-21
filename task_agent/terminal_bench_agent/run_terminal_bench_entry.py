@@ -172,15 +172,13 @@ def _model_calls_from_messages(messages: list[dict[str, Any]]) -> list[dict[str,
 
 def _normalize_task_id(value: Any, trial_name: str) -> str:
     if isinstance(value, str) and value:
-        task_id = value.rsplit("/", 1)[-1]
-    elif isinstance(value, dict):
+        return value.rsplit("/", 1)[-1]
+    if isinstance(value, dict):
         task_path = value.get("path") or value.get("name") or value.get("ref")
-        task_id = Path(str(task_path)).name if task_path else trial_name
-    else:
-        task_id = trial_name
-    if "__" in task_id:
-        task_id = task_id.split("__", 1)[0]
-    return task_id
+        if task_path:
+            return Path(str(task_path)).name
+    # Only inferred trial names carry the generated trial suffix.
+    return trial_name.split("__", 1)[0]
 
 
 def _trial_records(job_dir: Path, job_result: dict[str, Any]) -> list[tuple[dict[str, Any], Path]]:
