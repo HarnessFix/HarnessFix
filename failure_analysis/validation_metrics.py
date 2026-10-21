@@ -42,9 +42,12 @@ HIGHER_IS_BETTER = {
 def load_eval_json(path_or_dir: str | Path) -> tuple[Path, dict[str, Any]]:
     path = Path(path_or_dir)
     if path.is_dir():
-        json_files = [item for item in path.glob("*.json") if not item.name.startswith("run_")]
+        json_files = sorted(item for item in path.glob("*.json")
+                            if item.is_file() and not item.name.startswith("run_"))
         if not json_files:
             raise FileNotFoundError(f"No JSON report found in {path}")
+        if len(json_files) > 1:
+            raise ValueError(f"Multiple JSON reports found in {path}; provide an explicit report file")
         path = json_files[0]
     return path, json.loads(path.read_text())
 
