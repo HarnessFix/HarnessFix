@@ -722,6 +722,7 @@ def _step_execution_status(step_nodes: list[dict[str, Any]]) -> str:
 def _step_external_effect(step_nodes: list[dict[str, Any]]) -> dict[str, Any]:
     effect_deltas = []
     state_nodes = []
+    effect_state_nodes = []
     for node in step_nodes:
         attrs = node.get("attributes", {}) or {}
         effect_delta = attrs.get("effect_delta")
@@ -729,6 +730,8 @@ def _step_external_effect(step_nodes: list[dict[str, Any]]) -> dict[str, Any]:
             effect_deltas.append(effect_delta)
         if node.get("type") in {"StateDeltaRecord", "ArtifactRecord"}:
             state_nodes.append(_node_id(node))
+            if not isinstance(effect_delta, dict) or effect_delta.get("has_task_state_change") is not False:
+                effect_state_nodes.append(_node_id(node))
     mutating_calls = []
     db_changes = []
     api_calls = []
@@ -737,13 +740,13 @@ def _step_external_effect(step_nodes: list[dict[str, Any]]) -> dict[str, Any]:
         mutating_calls.extend(delta.get("mutating_api_calls", []) or delta.get("mutating_calls", []) or [])
         db_changes.extend(delta.get("db_changes", []) or [])
     return {
-        "has_external_effect": bool(state_nodes or db_changes or mutating_calls),
+        "has_external_effect": bool(effect_state_nodes or db_changes or mutating_calls),
         "state_nodes": state_nodes,
         "api_call_count": len(api_calls),
         "mutating_api_call_count": len(mutating_calls),
         "db_change_count": len(db_changes),
         "summary": _effect_summary({"api_calls": api_calls, "mutating_api_calls": mutating_calls, "db_changes": db_changes})
-        or ("legacy_state_delta_present" if state_nodes else ""),
+        or ("legacy_state_delta_present" if effect_state_nodes else ""),
     }
 
 
