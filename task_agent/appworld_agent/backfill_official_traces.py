@@ -29,11 +29,10 @@ from appworld_agent.official_trace import (  # noqa: E402
 
 
 def _load_json(path: Path) -> dict[str, Any]:
-    try:
-        value = json.loads(path.read_text())
-    except json.JSONDecodeError:
-        return {}
-    return value if isinstance(value, dict) else {}
+    value = json.loads(path.read_text())
+    if not isinstance(value, dict):
+        raise ValueError("Trajectory must be a JSON object")
+    return value
 
 
 def _task_dir_for_lm_calls(path: Path) -> Path:
@@ -53,7 +52,15 @@ def iter_official_trace_dirs(root: Path) -> list[tuple[Path, Path]]:
 
 
 def backfill_trace(task_dir: Path, traj_path: Path, *, dry_run: bool, force: bool) -> dict[str, Any]:
-    traj = _load_json(traj_path)
+    try:
+        traj = _load_json(traj_path)
+    except ValueError:
+        return {
+            "status": "skipped",
+            "reason": "invalid original trajectory; preserved without changes",
+            "task_dir": str(task_dir),
+            "model_calls": 0,
+        }
     existing_model_calls = traj.get("model_calls") or []
     if existing_model_calls and not force:
         return {
