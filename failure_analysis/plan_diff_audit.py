@@ -62,6 +62,9 @@ def _syntax_check(candidate_dir: Path, changed_files: list[str]) -> list[str]:
         if not rel_path.endswith(".py"):
             continue
         file_path = candidate_dir / rel_path
+        # Deletions remain in the scope/budget audit, but have no source to compile.
+        if not file_path.exists() and not file_path.is_symlink():
+            continue
         try:
             compile(file_path.read_text(), str(file_path), "exec")
         except Exception as exc:
