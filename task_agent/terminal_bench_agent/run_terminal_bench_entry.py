@@ -336,7 +336,7 @@ def _convert_outputs(
 
 def main() -> None:
     parser = argparse.ArgumentParser(description="Run Terminal-Bench 2.0 with local Harbor")
-    parser.add_argument("--subset", type=Path, default=DEFAULT_DATASET, help="Local Terminal-Bench dataset/subset directory")
+    parser.add_argument("--subset", type=Path, default=None, help="Local Terminal-Bench dataset/subset directory")
     parser.add_argument("--model", default="openai/gpt-5-mini")
     parser.add_argument("--agent", choices=["terminus-2", "mini-swe-agent"], default="terminus-2")
     parser.add_argument("--workers", type=int, default=2, help="Harbor --n-concurrent value")
@@ -350,6 +350,10 @@ def main() -> None:
     parser.add_argument("--no-store-all-messages", dest="store_all_messages", action="store_false", help="Do not store full Terminus-2 chat messages in Harbor TrialResult metadata")
     parser.set_defaults(store_all_messages=True)
     args = parser.parse_args()
+    if args.subset is None:
+        args.subset = DEFAULT_DATASET
+    elif not args.subset.is_dir():
+        parser.error(f"--subset directory not found: {args.subset}")
 
     args.output.mkdir(parents=True, exist_ok=True)
     job_dir = _run_harbor(args)
