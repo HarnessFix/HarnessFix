@@ -560,6 +560,8 @@ def step_compare_train(version: int, model: str,
         "--max-regression", "9999",  # No hard gate on train — just record
         "--min-improvement", "0",
     ]
+    # Do not reuse metrics or approval from a previous attempt.
+    output.unlink(missing_ok=True)
     subprocess.run(cmd, capture_output=False, text=True, check=False)
 
     if output.exists():
@@ -658,6 +660,8 @@ def step_plan_diff_audit(version: int, model: str, base_version: int, plan_path:
         "--spec", str(plan_spec_path(plan_path)),
         "--output", str(output_path),
     ]
+    # A failed rerun must not inherit an approval from an earlier candidate.
+    output_path.unlink(missing_ok=True)
     subprocess.run(cmd, capture_output=False, text=True, check=False)
     if output_path.exists():
         return json.loads(output_path.read_text())
@@ -695,10 +699,12 @@ def step_gate_check(version: int, baseline_eval_dir: Path, val_eval_dir: Path,
         "--min-improvement", str(min_improvement),
         "--max-cost-ratio", str(max_cost_ratio),
     ]
-    result = subprocess.run(cmd, capture_output=False, text=True, check=False)
+    # Do not reuse metrics or approval from a previous attempt.
+    gate_output.unlink(missing_ok=True)
+    subprocess.run(cmd, capture_output=False, text=True, check=False)
     if gate_output.exists():
         return load_gate_result(gate_output)
-    return {"passed": result.returncode == 0, "regressed_ids": []}
+    return {"passed": False, "regressed_ids": []}
 
 
 def step_record_memory(mode: str, version: int, plan_path: Path, audit: dict | None,
